@@ -2,6 +2,35 @@ from unittest import TestCase
 from discoverpagination.helpers import *
 
 
+class TestSplitDictionaryInHalf(TestCase):
+
+    def test_split_dictionary_in_half_len_2(self):
+        # arrange
+        subject = {1: "one", 2: "two"}
+
+        # action
+        first, second = split_dictionary_in_half(subject)
+
+        # assert
+        if 1 not in first:
+            self.assertTrue(1 in second)
+
+        if 2 not in first:
+            self.assertTrue(2 in second)
+
+        if 1 not in second:
+            self.assertTrue(1 in first)
+
+        if 2 not in second:
+            self.assertTrue(2 in first)
+
+        if 1 in first:
+            self.assertTrue(1 not in second)
+
+        if 2 in first:
+            self.assertTrue(2 not in second)
+
+
 class TestSectionContinuousNumbers(TestCase):
 
     def test_section_continuous_numbers_make_continuous_sublists(self):
@@ -275,3 +304,128 @@ class TestGetLinesRangeFromPageRange(TestCase):
         # assert
         self.assertEqual(30, start_line)
         self.assertEqual(160, end_line)
+
+
+class TestLongestMatchFromList(TestCase):
+
+    def test_longest_match_from_list_simple(self):
+        # arrange
+        test_list = [PAGE_NUMBER_TEMPLATE_STR, PAGE_NUMBER_TEMPLATE_STR]
+
+        # action
+        result = longest_match_from_list(test_list)
+
+        # assert
+        expected = PAGE_NUMBER_TEMPLATE_STR
+        self.assertEqual(expected, result)
+
+    def test_longest_match_from_list_complex(self):
+        # arrange
+        test_list = ['They established their capital at Tula ' + PAGE_NUMBER_TEMPLATE_STR + ', north of the Mexican', '' + PAGE_NUMBER_TEMPLATE_STR + " appearance of almost modern constructions."]
+
+        # action
+        result = longest_match_from_list(test_list)
+
+        # assert
+        expected = PAGE_NUMBER_TEMPLATE_STR
+        self.assertEqual(expected, result)
+
+    def test_longest_match_from_list_extremities(self):
+        # arrange
+        test_list = ['They established their capital at Tula ' + PAGE_NUMBER_TEMPLATE_STR, PAGE_NUMBER_TEMPLATE_STR + " appearance of almost modern constructions."]
+
+        # action
+        result = longest_match_from_list(test_list)
+
+        # assert
+        expected = PAGE_NUMBER_TEMPLATE_STR
+        self.assertEqual(expected, result)
+
+    def test_longest_match_from_list_long(self):
+        # arrange
+        test_list = ["---ABCDE" + PAGE_NUMBER_TEMPLATE_STR + "FGHI---", "---ABCDE" + PAGE_NUMBER_TEMPLATE_STR + "FGHI---"]
+
+        # action
+        result = longest_match_from_list(test_list)
+
+        # assert
+        expected = "---ABCDE" + PAGE_NUMBER_TEMPLATE_STR + "FGHI---"
+        self.assertEqual(expected, result)
+
+    def test_longest_match_from_list_complex_long(self):
+        # arrange
+        test_list = ["They established their capital at Tula ---ABCDE" + PAGE_NUMBER_TEMPLATE_STR + "FGHI---, north of the Mexican", "appearance of almost modern---ABCDE" + PAGE_NUMBER_TEMPLATE_STR + "FGHI--- constructions."]
+
+        # action
+        result = longest_match_from_list(test_list)
+
+        # assert
+        expected = "---ABCDE" + PAGE_NUMBER_TEMPLATE_STR + "FGHI---"
+        self.assertEqual(expected, result)
+
+
+class TestLongestMatchInPageMarkerPair(TestCase):
+
+    def test_longest_match_in_page_marker_pair_simple(self):
+        # arrange
+        page_markers_forward = {19: (1475, '19'),
+                                22: (1484, '22')}
+
+        # action
+        result = longest_match_in_page_marker_pair(page_markers_forward)
+
+        # assert
+        expected = PAGE_NUMBER_TEMPLATE_STR
+        self.assertEqual(expected, result)
+
+    def test_longest_match_in_page_marker_pair_long(self):
+        # arrange
+        page_markers_forward = {
+            19: (1475, 'times.asd19dsa They established their capital at Tula, north of the Mexican'),
+            22: (1484, 'appearance of almost modern constructions.fgh22hgf')}
+
+        # action
+        result = longest_match_in_page_marker_pair(page_markers_forward)
+
+        # assert
+        expected = PAGE_NUMBER_TEMPLATE_STR
+        self.assertEqual(expected, result)
+
+    def test_longest_match_in_page_marker_pair_extremities(self):
+        # arrange
+        page_markers_forward = {
+            19: (1475, '19asddsatimes. They established their capital at Tula, north of the Mexican'),
+            22: (1484, 'appearance of almost modern constructions.fghhgf22')}
+
+        # action
+        result = longest_match_in_page_marker_pair(page_markers_forward)
+
+        # assert
+        expected = PAGE_NUMBER_TEMPLATE_STR
+        self.assertEqual(expected, result)
+
+    def test_longest_match_in_page_marker_pair_complex(self):
+        # arrange
+        page_markers_forward = {
+            19: (1475, 'times.[19] They established their capital at Tula, north of the Mexican'),
+            22: (1484, 'appearance of almost modern constructions.[22]')}
+
+        # action
+        result = longest_match_in_page_marker_pair(page_markers_forward)
+
+        # assert
+        expected = 's.[' + PAGE_NUMBER_TEMPLATE_STR + ']'
+        self.assertEqual(expected, result)
+
+    def test_longest_match_in_page_marker_pair_complex_long(self):
+        # arrange
+        page_markers_forward = {
+            19: (1475, 'times. --ABCD[19]EFGH-- They established their capital at Tula, north of the Mexican'),
+            22: (1484, 'appearance of almost modern constructions. --ABCD[22]EFGH--')}
+
+        # action
+        result = longest_match_in_page_marker_pair(page_markers_forward)
+
+        # assert
+        expected = 's. --ABCD[' + PAGE_NUMBER_TEMPLATE_STR + ']EFGH--'
+        self.assertEqual(expected, result)

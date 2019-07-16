@@ -19,7 +19,6 @@ class TestDiscoverPages(TestCase):
         self.assertFalse(0)
         pass
 
-
     def test_discover_pages_find_intraline_number_as_pattern(self):
         # arrange
         document = ["""engendered, probably, by the decomposition of rank vegetable substances\n""",
@@ -37,7 +36,6 @@ class TestDiscoverPages(TestCase):
 
         # assert
         self.assertFalse(0)
-        pass
 
 
 class TestIsIntralineDocument(TestCase):

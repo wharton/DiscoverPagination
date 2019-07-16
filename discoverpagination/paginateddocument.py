@@ -3,7 +3,7 @@ import re
 from abc import abstractmethod
 from collections import Sequence
 from string import Template
-from typing import TextIO, List, overload
+from typing import TextIO, List, overload, Dict, Tuple
 from .helpers import *
 from .fuzzyfind import *
 from statistics import mean
@@ -13,9 +13,10 @@ import os
 import hashlib
 from io import StringIO
 from collections import Counter
+from math import ceil
 
 page_number_template = Template(
-    r"(?<!(rule|form|year|ears|tion) )(?<![-/,.$$:;])(?<!&#)[\[\{\(]?${page_number}[\b\]\}\)]?(?![\-:,%/\d])(?!\W? (day|of|west|east|south|years?))(?!\.(\d|\S))")
+    r"(?<!(rule|form|year|ears|tion) )(?<![-/,.$$:;])(?<!&#)" + PAGE_NUMBER_TEMPLATE_STR + r"(?![\-:,%/\d])(?!\W? (day|of|west|east|south|years?))(?!\.(\d|\S))")
 tag_attribute_PATTERN = r'(v?align|src|alt|colspan|rowspan|style|cellpadding|id|width|height|(bg)?color|cellspacing|border|face|name|size)=(\'|").*?(\3)'
 tag_attribute_RE = re.compile(tag_attribute_PATTERN, flags=re.DOTALL | re.IGNORECASE)
 
@@ -28,6 +29,7 @@ tag_condense_RE = re.compile(tag_condense_PATTERN, flags=re.DOTALL | re.IGNORECA
 word_PATTEN = r'\b\w+\b'
 word_RE = re.compile(word_PATTEN, re.IGNORECASE)
 
+
 def clean_document_attributes(dirty_text: List[str]):
     document = list(itertools.dropwhile(lambda x: not re.match('<DOCUMENT>', x, flags=re.IGNORECASE),
                                         dirty_text))
@@ -38,6 +40,62 @@ def clean_document_attributes(dirty_text: List[str]):
     input_no_attributes = re.sub(tag_attribute_RE, ' ', input_end)
     input_noshade = re.sub(tag_noshade_RE, ' ', input_no_attributes)
     return StringIO(re.sub(tag_condense_RE, r'\g<1>\g<2>', input_noshade)).readlines()
+
+
+def gather_intraline_combined_page_markers(page_markers_forward, page_markers_reverse):
+    all_page_numbers = sort_unique([k for k in page_markers_forward.keys()])
+
+    # TODO: Do something real with this aside from throw an exception
+    if len(page_markers_forward) < 20 or len(page_markers_reverse) < 20:
+        raise Exception("This shouldn't be an exception, but here we are.")
+
+    fifteen_percent_forward = ceil((len(page_markers_forward) * .15))
+    fifteen_percent_reverse = ceil((len(page_markers_reverse) * .15))
+
+    forward_min = min(all_page_numbers)
+    reverse_max = max(all_page_numbers)
+
+    normalized_forward = normalize_page_numbers_to_template(page_markers_forward)
+    normalized_reverse = normalize_page_numbers_to_template(page_markers_reverse)
+
+    worsted_forward = {k: v for k, v in normalized_forward.items() if k >= forward_min + fifteen_percent_forward}
+    worsted_reverse = {k: v for k, v in page_markers_reverse.keys() if k <= reverse_max - fifteen_percent_reverse}
+
+    best_match_forward = recurse_through_page_markers(worsted_forward)
+    best_match_reverse = recurse_through_page_markers(worsted_reverse)
+
+
+def recurse_through_page_markers(page_markers):
+    if len(page_markers) == 1:
+        return page_markers[page_markers.keys()[0]][1]
+    if len(page_markers) > 2:
+        first_dict, second_dict = split_dictionary_in_half(page_markers)
+        recurse_through_page_markers(first_dict), recurse_through_page_markers(second_dict)
+
+
+def iterative_page_number_search(template, document_slice, known_pages, start_page):
+    last_page = start_page - 1
+    last_index = 0
+    found_page = True
+    while found_page:
+        page_number = last_page + 1
+        page_find_regex = template.substitute(page_number=page_number)
+
+        for line_number, line in enumerate(document_slice[last_index:], last_index):
+            found_page = re.search(page_find_regex, line)
+            if found_page:
+                if line[-1:] == "\n":
+                    known_pages[page_number] = (line_number, line[:-1])
+                elif line[-2:] == "\r\n":
+                    known_pages[page_number] = (line_number, line[:-2])
+                else:
+                    known_pages[page_number] = (line_number, line)
+
+                last_index = line_number
+                last_page = page_number
+                break
+
+    return known_pages
 
 
 def reversed_sliced_page_number_search(template, forward_document_slice, known_pages, start_page, end_page, last_index):
@@ -61,31 +119,6 @@ def reversed_sliced_page_number_search(template, forward_document_slice, known_p
                 else:
                     known_pages[page_number] = (line_number, line)
                 last_page = page_number - 1
-                break
-
-    return known_pages
-
-
-def iterative_page_number_search(template, document_slice, known_pages, start_page):
-    last_page = start_page - 1
-    last_index = 0
-    found_page = True
-    while found_page:
-        page_number = last_page + 1
-        page_find_regex = template.substitute(page_number=page_number)
-
-        for line_number, line in enumerate(document_slice[last_index:], last_index):
-            found_page = re.search(page_find_regex, line)
-            if found_page:
-                if line[-1:] == "\n":
-                    known_pages[page_number] = (line_number, line[:-1])
-                elif line[-2:] == "\r\n":
-                    known_pages[page_number] = (line_number, line[:-2])
-                else:
-                    known_pages[page_number] = (line_number, line)
-
-                last_index = line_number + 1
-                last_page = page_number
                 break
 
     return known_pages
@@ -124,17 +157,16 @@ def discover_pages(unmarked_document, template, start_page):
         # Select forward and backward page markers that match line no
         combined_page_markers = {k: v for k, v in page_markers_reverse.items() if match_or_close(k, v, page_markers_forward)}
     else:
-        combined_page_markers = None
+        combined_page_markers = gather_intraline_combined_page_markers(page_markers_forward, page_markers_reverse)
 
     # Create counts of each type of page marker
     likely_page_markers = Counter()
+
     for i in combined_page_markers.keys():
-        discovered_template = combined_page_markers[i][1].replace(str(i), "${page_number}")
+        discovered_template = combined_page_markers[i][1].replace(str(i), PAGE_NUMBER_TEMPLATE_STR)
         likely_page_markers[discovered_template] = likely_page_markers[discovered_template] + 1
     best_match = max(likely_page_markers.items(), key=operator.itemgetter(1))[0]
-    unfound_pages = sorted(
-        [k for k in all_page_numbers if
-         k not in combined_page_markers or combined_page_markers[k][1].replace(str(k), "${page_number}") != best_match])
+    unfound_pages = sorted([k for k in all_page_numbers if k not in combined_page_markers or combined_page_markers[k][1].replace(str(k), PAGE_NUMBER_TEMPLATE_STR) != best_match])
     found_pages = {k: v for k, v in combined_page_markers.items() if k not in unfound_pages}
 
     # page_distances = [found_pages[page + 1][0] - found_pages[page][0] for page in all_page_numbers if
