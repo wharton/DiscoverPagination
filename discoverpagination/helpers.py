@@ -1,9 +1,13 @@
-from math import floor
-from typing import List, Dict, Tuple
+from math import ceil
+from typing import List, Dict, Tuple, TypeVar
 from difflib import SequenceMatcher
 from random import shuffle
 
-PAGE_NUMBER_TEMPLATE_STR = r'${page_number}'
+KT = TypeVar('KT')
+VT = TypeVar('VT')
+
+PAGE_NUMBER_NAME = r'page_number_of_a_really_long_length'
+PAGE_NUMBER_TEMPLATE_STR = r'${' + PAGE_NUMBER_NAME + r'}'
 
 
 def section_continuous_numbers(arr: List[int]) -> List[List[int]]:
@@ -28,9 +32,9 @@ def section_continuous_numbers(arr: List[int]) -> List[List[int]]:
     return number_lists
 
 
-def split_dictionary_in_half(d: Dict):
+def shuffle_split_dictionary_in_half(d: Dict[KT, VT]) -> Tuple[Dict[KT, VT], Dict[KT, VT]]:
     shuffled_keys = list(d.keys())
-    half_length = floor(len(shuffled_keys) / 2)
+    half_length = ceil(len(shuffled_keys) / 2)
     shuffle(shuffled_keys)
 
     first_half = {k: v for k, v in d.items() if shuffled_keys.index(k) <= half_length - 1}
@@ -39,7 +43,7 @@ def split_dictionary_in_half(d: Dict):
     return first_half, second_half
 
 
-def normalize_page_numbers_to_template(page_number_dict: Dict[int, Tuple[int, str]]):
+def normalize_page_numbers_to_template(page_number_dict: Dict[int, Tuple[int, str]]) -> Dict[int, Tuple[int, str]]:
     return {k: (v[0], v[1].replace(str(k), PAGE_NUMBER_TEMPLATE_STR)) for k, v in page_number_dict.items()}
 
 
@@ -70,7 +74,7 @@ def get_window_from_found_pages(section_pages: List[int], found_pages: Dict[int,
     return start_line, end_line
 
 
-def longest_match_in_page_marker_pair(page_markers: Dict[int, Tuple[int, str]]):
+def longest_match_in_page_marker_pair(page_markers: Dict[int, Tuple[int, str]]) -> str:
     if len(page_markers) != 2:
         raise ValueError("'page_markers' must be a Dict of len 2.")
     normalized_page_numbers = normalize_page_numbers_to_template(page_markers)
@@ -80,7 +84,7 @@ def longest_match_in_page_marker_pair(page_markers: Dict[int, Tuple[int, str]]):
     return longest_match_from_list(normalized_lines)
 
 
-def longest_match_from_list(normalized_lines: List[str]):
+def longest_match_from_list(normalized_lines: List[str]) -> str:
     if len(normalized_lines) != 2:
         raise ValueError("'normalized_lines' must be a list of len 2.")
 
@@ -117,4 +121,5 @@ def get_lines_range_from_page_range(start_page: int, end_page: int, found_pages:
     return start_line, end_line
 
 
-__all__ = ['section_continuous_numbers', 'get_window_from_found_pages', 'sort_unique', 'get_lines_range_from_page_range', 'PAGE_NUMBER_TEMPLATE_STR', 'normalize_page_numbers_to_template', 'longest_match_in_page_marker_pair', 'longest_match_from_list', 'split_dictionary_in_half']
+__all__ = ['section_continuous_numbers', 'get_window_from_found_pages', 'sort_unique', 'get_lines_range_from_page_range', 'PAGE_NUMBER_TEMPLATE_STR', 'normalize_page_numbers_to_template', 'longest_match_in_page_marker_pair', 'longest_match_from_list',
+           'shuffle_split_dictionary_in_half', 'PAGE_NUMBER_NAME']

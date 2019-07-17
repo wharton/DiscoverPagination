@@ -16,7 +16,7 @@ from collections import Counter
 from math import ceil
 
 page_number_template = Template(
-    r"(?<!(rule|form|year|ears|tion) )(?<![-/,.$$:;])(?<!&#)" + PAGE_NUMBER_TEMPLATE_STR + r"(?![\-:,%/\d])(?!\W? (day|of|west|east|south|years?))(?!\.(\d|\S))")
+    r"(?<!(rule|form|year|ears|tion) )(?<!\d.)(?<![-/,$$:;])(?<!&#)(?<=\D)" + PAGE_NUMBER_TEMPLATE_STR + r"(?=\D)(?![\-:,%/\d])(?!\.(\d|\S))")
 tag_attribute_PATTERN = r'(v?align|src|alt|colspan|rowspan|style|cellpadding|id|width|height|(bg)?color|cellspacing|border|face|name|size)=(\'|").*?(\3)'
 tag_attribute_RE = re.compile(tag_attribute_PATTERN, flags=re.DOTALL | re.IGNORECASE)
 
@@ -59,18 +59,19 @@ def gather_intraline_combined_page_markers(page_markers_forward, page_markers_re
     normalized_reverse = normalize_page_numbers_to_template(page_markers_reverse)
 
     worsted_forward = {k: v for k, v in normalized_forward.items() if k >= forward_min + fifteen_percent_forward}
-    worsted_reverse = {k: v for k, v in page_markers_reverse.keys() if k <= reverse_max - fifteen_percent_reverse}
+    worsted_reverse = {k: v for k, v in normalized_reverse.items() if k <= reverse_max - fifteen_percent_reverse}
 
     best_match_forward = recurse_through_page_markers(worsted_forward)
     best_match_reverse = recurse_through_page_markers(worsted_reverse)
+    pass
 
 
-def recurse_through_page_markers(page_markers):
+def recurse_through_page_markers(page_markers: Dict[int, Tuple[int, str]]) -> str:
     if len(page_markers) == 1:
-        return page_markers[page_markers.keys()[0]][1]
-    if len(page_markers) > 2:
-        first_dict, second_dict = split_dictionary_in_half(page_markers)
-        recurse_through_page_markers(first_dict), recurse_through_page_markers(second_dict)
+        return list(page_markers.values())[0][1]
+    if len(page_markers) >= 2:
+        first_dict, second_dict = shuffle_split_dictionary_in_half(page_markers)
+        return longest_match_from_list([recurse_through_page_markers(first_dict), recurse_through_page_markers(second_dict)])
 
 
 def iterative_page_number_search(template, document_slice, known_pages, start_page):
@@ -79,7 +80,7 @@ def iterative_page_number_search(template, document_slice, known_pages, start_pa
     found_page = True
     while found_page:
         page_number = last_page + 1
-        page_find_regex = template.substitute(page_number=page_number)
+        page_find_regex = template.substitute({f"{PAGE_NUMBER_NAME}": page_number})
 
         for line_number, line in enumerate(document_slice[last_index:], last_index):
             found_page = re.search(page_find_regex, line)
@@ -108,7 +109,7 @@ def reversed_sliced_page_number_search(template, forward_document_slice, known_p
     while found_page and start_page <= last_page:
 
         page_number = last_page
-        page_find_regex = template.substitute(page_number=page_number)
+        page_find_regex = template.substitute({f"{PAGE_NUMBER_NAME}": page_number})
         for line_number, line in reversed_document_slice:
             found_page = re.search(page_find_regex, line, re.IGNORECASE)
             if found_page:
@@ -234,7 +235,7 @@ class PaginatedDocument(Sequence):
     def get_page_template(self):
         likely_page_markers = Counter()
         for i in self.page_endings.keys():
-            discovered_template = self.page_endings[i][1].replace(str(i), "${page_number}")
+            discovered_template = self.page_endings[i][1].replace(str(i), PAGE_NUMBER_TEMPLATE_STR)
             likely_page_markers[discovered_template] = likely_page_markers[discovered_template] + 1
             return max(likely_page_markers.items(), key=operator.itemgetter(1))[0]
 

@@ -9,9 +9,14 @@ class TestSplitDictionaryInHalf(TestCase):
         subject = {1: "one", 2: "two"}
 
         # action
-        first, second = split_dictionary_in_half(subject)
+        first, second = shuffle_split_dictionary_in_half(subject)
 
         # assert
+
+        self.assertEqual(2, len(subject))
+        self.assertEqual(1, len(first))
+        self.assertEqual(1, len(second))
+
         if 1 not in first:
             self.assertTrue(1 in second)
 
@@ -29,6 +34,69 @@ class TestSplitDictionaryInHalf(TestCase):
 
         if 2 in first:
             self.assertTrue(2 not in second)
+
+        # No overlapping keys
+        self.assertFalse([k for k in first.keys() if k in second.keys()])
+
+    def test_split_dictionary_in_half_len_5(self):
+        # arrange
+        subject = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five"}
+
+        # action
+        first, second = shuffle_split_dictionary_in_half(subject)
+
+        # assert
+        self.assertEqual(5, len(subject))
+        self.assertEqual(3, len(first))
+        self.assertEqual(2, len(second))
+
+        # No overlapping keys
+        self.assertFalse([k for k in first.keys() if k in second.keys()])
+
+    def test_split_dictionary_in_half_len_6(self):
+        # arrange
+        subject = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}
+
+        # action
+        first, second = shuffle_split_dictionary_in_half(subject)
+
+        # assert
+        self.assertEqual(6, len(subject))
+        self.assertEqual(3, len(first))
+        self.assertEqual(3, len(second))
+
+        # No overlapping keys
+        self.assertFalse([k for k in first.keys() if k in second.keys()])
+
+    def test_split_dictionary_in_half_len_1(self):
+        # arrange
+        subject = {1: "one"}
+
+        # action
+        first, second = shuffle_split_dictionary_in_half(subject)
+
+        # assert
+        self.assertEqual(1, len(subject))
+        self.assertEqual(1, len(first))
+        self.assertEqual(0, len(second))
+
+        # No overlapping keys
+        self.assertFalse([k for k in first.keys() if k in second.keys()])
+
+    def test_split_dictionary_in_half_len_0(self):
+        # arrange
+        subject = {}
+
+        # action
+        first, second = shuffle_split_dictionary_in_half(subject)
+
+        # assert
+        self.assertEqual(0, len(subject))
+        self.assertEqual(0, len(first))
+        self.assertEqual(0, len(second))
+
+        # No overlapping keys
+        self.assertFalse([k for k in first.keys() if k in second.keys()])
 
 
 class TestSectionContinuousNumbers(TestCase):
