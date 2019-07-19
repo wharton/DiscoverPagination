@@ -26,7 +26,7 @@ tag_noshade_RE = re.compile(tag_noshade_PATTERN, flags=re.DOTALL | re.IGNORECASE
 tag_condense_PATTERN = r'(<\w+)\s*?(>)'
 tag_condense_RE = re.compile(tag_condense_PATTERN, flags=re.DOTALL | re.IGNORECASE)
 
-word_PATTEN = r'\b\w+\b'
+word_PATTEN = r'(?<![\/=])\b[a-zA-Z]{3,}\b(?![\/=])'
 word_RE = re.compile(word_PATTEN, re.IGNORECASE)
 
 
@@ -42,7 +42,7 @@ def clean_document_attributes(dirty_text: List[str]):
     return StringIO(re.sub(tag_condense_RE, r'\g<1>\g<2>', input_noshade)).readlines()
 
 
-def gather_intraline_combined_page_markers(page_markers_forward, page_markers_reverse):
+def discover_new_page_template(page_markers_forward, page_markers_reverse):
     all_page_numbers = sort_unique([k for k in page_markers_forward.keys()])
 
     # TODO: Do something real with this aside from throw an exception
@@ -127,8 +127,7 @@ def reversed_sliced_page_number_search(template, forward_document_slice, known_p
 
 def retry_missing_pages(search_template, document_slice, missing_page_numbers, known_pages, offset):
     sorted_page_numbers = sort_unique(missing_page_numbers)
-    return reversed_sliced_page_number_search(search_template, document_slice, known_pages, sorted_page_numbers[0],
-                                              sorted_page_numbers[-1], offset)
+    return reversed_sliced_page_number_search(search_template, document_slice, known_pages, sorted_page_numbers[0], sorted_page_numbers[-1], offset)
 
 
 def match_or_close(page_number, line_marker,  page_markers_forward):
@@ -142,24 +141,31 @@ def is_intraline_document(page_markers_forward, page_markers_reverse):
     return forward_word_scores > 4 or reverse_word_scores > 4
 
 
-def discover_pages(unmarked_document, template, start_page):
-    page_markers_forward = {}
-
+def find_forward_and_reverse_page_numbers(page_markers_forward, start_page, template, unmarked_document):
     # Going numerically forward get all page markers
     page_markers_forward = iterative_page_number_search(template, unmarked_document, page_markers_forward, start_page)
-
     all_page_numbers = sort_unique([k for k in page_markers_forward.keys()])
-
     # Going backward get all page markers
     page_markers_reverse = reversed_sliced_page_number_search(template, unmarked_document, {}, all_page_numbers[0],
                                                               all_page_numbers[-1], 0)
+    return all_page_numbers, page_markers_forward, page_markers_reverse
+
+
+def discover_pages(unmarked_document, template, start_page):
+    page_markers_forward = {}
+
+    all_page_numbers, page_markers_forward, page_markers_reverse = find_forward_and_reverse_page_numbers(
+        page_markers_forward, start_page, template, unmarked_document)
 
     if not is_intraline_document(page_markers_forward, page_markers_reverse):
         # Select forward and backward page markers that match line no
         combined_page_markers = {k: v for k, v in page_markers_reverse.items() if match_or_close(k, v, page_markers_forward)}
     else:
-        combined_page_markers = gather_intraline_combined_page_markers(page_markers_forward, page_markers_reverse)
-
+        best_match = discover_new_page_template(page_markers_forward, page_markers_reverse)
+        if best_match == PAGE_NUMBER_TEMPLATE_STR:
+            combined_page_markers = {k: v for k, v in page_markers_reverse.items() if
+                                     match_or_close(k, v, page_markers_forward)}
+            
     # Create counts of each type of page marker
     likely_page_markers = Counter()
 
