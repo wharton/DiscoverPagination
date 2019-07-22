@@ -1,4 +1,5 @@
-from discoverpagination.paginateddocument import discover_pages, page_number_template, is_intraline_document
+from discoverpagination.paginateddocument import discover_pages, is_intraline_document, page_number_template
+from string import Template
 from unittest import TestCase
 
 
@@ -13,10 +14,10 @@ class TestDiscoverPages(TestCase):
 
 
         # action
-        result = discover_pages(document, page_number_template, 7)
+        result = discover_pages(document, page_number_template, 7, force_short_discovery=True)
 
         # assert
-        self.assertFalse(0)
+        self.assertTrue(7 in result)
         pass
 
     def test_discover_pages_find_intraline_number_as_pattern(self):
@@ -32,10 +33,10 @@ class TestDiscoverPages(TestCase):
                     ]
 
         # action
-        result = discover_pages(document, page_number_template, 7)
+        result = discover_pages(document, page_number_template, 7, force_short_discovery=True)
 
         # assert
-        self.assertFalse(0)
+        self.assertTrue(7 in result)
 
 
 class TestIsIntralineDocument(TestCase):

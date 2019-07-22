@@ -63,8 +63,11 @@ def get_window_from_found_pages(section_pages: List[int], found_pages: Dict[int,
 
     start_line = 0
     if start > 1:
-        start_page = max({page: t for page, t in found_pages.items() if page < start}.keys())
-        start_line = found_pages[start_page][0]
+        earliest_Known_pages = {page: t for page, t in found_pages.items() if page < start}.keys()
+
+        if earliest_Known_pages:
+            start_page = max(earliest_Known_pages)
+            start_line = found_pages[start_page][0]
 
     end_line = document_size - 1
     if max(section_pages) < max_found:

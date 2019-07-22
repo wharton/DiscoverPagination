@@ -42,15 +42,19 @@ def clean_document_attributes(dirty_text: List[str]):
     return StringIO(re.sub(tag_condense_RE, r'\g<1>\g<2>', input_noshade)).readlines()
 
 
-def discover_new_page_template(page_markers_forward, page_markers_reverse):
+def discover_new_page_template(page_markers_forward, page_markers_reverse, force_short_discovery=False):
     all_page_numbers = sort_unique([k for k in page_markers_forward.keys()])
 
     # TODO: Do something real with this aside from throw an exception
-    if len(page_markers_forward) < 20 or len(page_markers_reverse) < 20:
+    if not force_short_discovery and (len(page_markers_forward) < 20 or len(page_markers_reverse) < 20):
         raise Exception("This shouldn't be an exception, but here we are.")
 
-    fifteen_percent_forward = ceil((len(page_markers_forward) * .15))
-    fifteen_percent_reverse = ceil((len(page_markers_reverse) * .15))
+    if force_short_discovery:
+        fifteen_percent_forward = 0
+        fifteen_percent_reverse = 0
+    else:
+        fifteen_percent_forward = ceil((len(page_markers_forward) * .15))
+        fifteen_percent_reverse = ceil((len(page_markers_reverse) * .15))
 
     forward_min = min(all_page_numbers)
     reverse_max = max(all_page_numbers)
@@ -63,7 +67,14 @@ def discover_new_page_template(page_markers_forward, page_markers_reverse):
 
     best_match_forward = recurse_through_page_markers(worsted_forward)
     best_match_reverse = recurse_through_page_markers(worsted_reverse)
-    pass
+    if best_match_forward == best_match_reverse:
+        return best_match_forward
+    else:
+        combined_best_match = longest_match_from_list([best_match_forward, best_match_reverse])
+        if len(combined_best_match) > len(PAGE_NUMBER_TEMPLATE_STR):
+            return combined_best_match
+        else:
+            return PAGE_NUMBER_TEMPLATE_STR
 
 
 def recurse_through_page_markers(page_markers: Dict[int, Tuple[int, str]]) -> str:
@@ -110,6 +121,8 @@ def reversed_sliced_page_number_search(template, forward_document_slice, known_p
 
         page_number = last_page
         page_find_regex = template.substitute({f"{PAGE_NUMBER_NAME}": page_number})
+        if template != page_number_template:
+            page_find_regex = re.escape(page_find_regex)
         for line_number, line in reversed_document_slice:
             found_page = re.search(page_find_regex, line, re.IGNORECASE)
             if found_page:
@@ -151,9 +164,9 @@ def find_forward_and_reverse_page_numbers(page_markers_forward, start_page, temp
     return all_page_numbers, page_markers_forward, page_markers_reverse
 
 
-def discover_pages(unmarked_document, template, start_page):
+def discover_pages(unmarked_document, template, start_page, force_short_discovery=False):
     page_markers_forward = {}
-
+    best_match = None
     all_page_numbers, page_markers_forward, page_markers_reverse = find_forward_and_reverse_page_numbers(
         page_markers_forward, start_page, template, unmarked_document)
 
@@ -161,21 +174,31 @@ def discover_pages(unmarked_document, template, start_page):
         # Select forward and backward page markers that match line no
         combined_page_markers = {k: v for k, v in page_markers_reverse.items() if match_or_close(k, v, page_markers_forward)}
     else:
-        best_match = discover_new_page_template(page_markers_forward, page_markers_reverse)
+        best_match = discover_new_page_template(page_markers_forward, page_markers_reverse, force_short_discovery)
         if best_match == PAGE_NUMBER_TEMPLATE_STR:
             combined_page_markers = {k: v for k, v in page_markers_reverse.items() if
                                      match_or_close(k, v, page_markers_forward)}
-            
+        else:
+            all_page_numbers, page_markers_forward, page_markers_reverse = find_forward_and_reverse_page_numbers(
+                page_markers_forward, start_page, Template(best_match), unmarked_document)
+            combined_page_markers = {k: v for k, v in page_markers_reverse.items() if
+                                     match_or_close(k, v, page_markers_forward)}
+
     # Create counts of each type of page marker
     likely_page_markers = Counter()
 
-    for i in combined_page_markers.keys():
-        discovered_template = combined_page_markers[i][1].replace(str(i), PAGE_NUMBER_TEMPLATE_STR)
-        likely_page_markers[discovered_template] = likely_page_markers[discovered_template] + 1
-    best_match = max(likely_page_markers.items(), key=operator.itemgetter(1))[0]
-    unfound_pages = sorted([k for k in all_page_numbers if k not in combined_page_markers or combined_page_markers[k][1].replace(str(k), PAGE_NUMBER_TEMPLATE_STR) != best_match])
-    found_pages = {k: v for k, v in combined_page_markers.items() if k not in unfound_pages}
+    if not best_match:
+        for i in combined_page_markers.keys():
+            discovered_template = combined_page_markers[i][1].replace(str(i), PAGE_NUMBER_TEMPLATE_STR)
+            likely_page_markers[discovered_template] = likely_page_markers[discovered_template] + 1
+        best_match = max(likely_page_markers.items(), key=operator.itemgetter(1))[0]
 
+        unfound_pages = sorted([k for k in all_page_numbers if k not in combined_page_markers or combined_page_markers[k][1].replace(str(k), PAGE_NUMBER_TEMPLATE_STR) != best_match])
+        found_pages = {k: v for k, v in combined_page_markers.items() if k not in unfound_pages}
+
+    else:
+        unfound_pages = sorted([k for k in all_page_numbers if k not in combined_page_markers or best_match not in combined_page_markers[k][1].replace(str(k), PAGE_NUMBER_TEMPLATE_STR)])
+        found_pages = {k: v for k, v in combined_page_markers.items() if k not in unfound_pages}
     # page_distances = [found_pages[page + 1][0] - found_pages[page][0] for page in all_page_numbers if
     #                   page in found_pages and page + 1 in found_pages]
 
@@ -217,14 +240,11 @@ class PaginatedDocument(Sequence):
         start, stop = get_window_from_found_pages([s.start, s.stop], self.page_endings, len(self.cleaned))
         return self.cleaned[start:stop]
 
-    def __getitem__(self, i: int) -> List[str]:
-        start, stop = get_window_from_found_pages([i], self.page_endings, len(self.cleaned))
-        return self.cleaned[start:stop]
-
     def __len__(self):
         return len(self.page_endings)
 
     def __init__(self, document: TextIO, start_page: int = 1, clean_xml=False, write_tempfile=False):
+        super().__init__()
         self.original = document.readlines()
         self.cleaned = self.original
         if clean_xml:

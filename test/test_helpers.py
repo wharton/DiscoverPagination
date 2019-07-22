@@ -202,6 +202,17 @@ class TestGetWindowFromFoundPages(TestCase):
         # assert
         self.assertEqual(0, start)
 
+    def test_get_window_from_found_pages_first_page_equals_zero_gt_1(self):
+        # arrange
+        arr = [2]
+        found_pages = {3: (30, "ok"), 4: (40, "ok"), 5: (50, "ok"), 6: (60, "ok"), 7: (70, "ok"),
+                       8: (80, "ok"), 11: (110, "ok")}
+
+        # action
+        start, end = get_window_from_found_pages(arr, found_pages, document_size=110)
+
+        # assert
+        self.assertEqual(0, start)
     def test_get_window_from_found_pages_end_page_equals_document_size(self):
         # arrange
         arr = [9]
