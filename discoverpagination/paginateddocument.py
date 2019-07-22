@@ -234,11 +234,13 @@ def discover_pages(unmarked_document, template, start_page, force_short_discover
 
 class PaginatedDocument(Sequence):
 
-    @overload
-    @abstractmethod
-    def __getitem__(self, s: slice) -> List[str]:
-        start, stop = get_window_from_found_pages([s.start, s.stop], self.page_endings, len(self.cleaned))
-        return self.cleaned[start:stop]
+    def __getitem__(self, s):
+        if isinstance(s, slice):
+            start, stop = get_window_from_found_pages([s.start, s.stop], self.page_endings, len(self.cleaned))
+            return self.cleaned[start:stop]
+        elif isinstance(s, int):
+            start, stop = get_window_from_found_pages([s, s], self.page_endings, len(self.cleaned))
+            return self.cleaned[start:stop]
 
     def __len__(self):
         return len(self.page_endings)
