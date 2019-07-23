@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name='DiscoverPagination',
-    version='0.1.3',
+    version='0.1.4',
     packages=setuptools.find_packages(),
     license='MIT',
     author_email="dhking@wharton.upenn.edu",
