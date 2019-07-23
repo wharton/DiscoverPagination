@@ -1,0 +1,10 @@
+language: python
+python: 3.6
+before_install:
+- openssl aes-256-cbc -K $encrypted_31dfebda11a4_key -iv $encrypted_31dfebda11a4_iv
+  -in config.creds.json.enc -out config.creds.json -d
+install:
+- pip install -r requirements.txt
+script:
+- python setup.py test
+- python setup.py sdist bdist_wheel
