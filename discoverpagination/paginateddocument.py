@@ -30,13 +30,19 @@ word_PATTEN = r'(?<![\/=])\b[a-zA-Z]{3,}\b(?![\/=])'
 word_RE = re.compile(word_PATTEN, re.IGNORECASE)
 
 
-def clean_document_attributes(dirty_text: List[str]):
+def pull_first_html_document(dirty_xml):
     document = list(itertools.dropwhile(lambda x: not re.match('<DOCUMENT>', x, flags=re.IGNORECASE),
-                                        dirty_text))
+                                        dirty_xml))
+
     if len(document) < 1:
         raise Exception("No '<DOCUMENT>' section found.")
     input_end = ''.join(itertools.takewhile(lambda x: not re.match('</DOCUMENT>', x, flags=re.IGNORECASE),
                                             document)) + '</DOCUMENT>'
+    return input_end
+
+
+def clean_document_attributes(dirty_text: List[str]):
+    input_end = pull_first_html_document(dirty_text)
     input_no_attributes = re.sub(tag_attribute_RE, ' ', input_end)
     input_noshade = re.sub(tag_noshade_RE, ' ', input_no_attributes)
     return StringIO(re.sub(tag_condense_RE, r'\g<1>\g<2>', input_noshade)).readlines()
@@ -123,6 +129,7 @@ def reversed_sliced_page_number_search(template, forward_document_slice, known_p
         page_find_regex = template.substitute({f"{PAGE_NUMBER_NAME}": page_number})
         if template != page_number_template:
             page_find_regex = re.escape(page_find_regex)
+
         for line_number, line in reversed_document_slice:
             found_page = re.search(page_find_regex, line, re.IGNORECASE)
             if found_page:
@@ -268,7 +275,7 @@ class PaginatedDocument(Sequence):
             return max(likely_page_markers.items(), key=operator.itemgetter(1))[0]
 
 
-__all__ = ['PaginatedDocument']
+__all__ = ['PaginatedDocument', 'pull_first_html_document']
 
 
 
